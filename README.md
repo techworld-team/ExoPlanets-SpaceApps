@@ -1,6 +1,6 @@
 # A World Away: Hunting for Exoplanets with AI
 
-### Team Name: [Your Team's Name]
+### Team Name: [TechWorld]
 
 ### Team Members
 
