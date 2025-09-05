@@ -1,0 +1,529 @@
+# Member 3 - Data Exploration (ExoPlanets-SpaceApps)
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# ✅ Load the dataset directly from exoTest.csv.zip
+df = pd.read_csv("exoTest.csv.zip")
+
+# ✅ Show first 5 rows
+print("First 5 rows of the data:")
+display(df.head())
+
+# ✅ Show info about dataset
+print("\nDataFrame info:")
+df.info()
+
+# ✅ Summary statistics
+print("\nStatistical summary of numeric columns:")
+display(df.describe())
+
+# ✅ Label distribution (important for imbalance check)
+if "LABEL" in df.columns:
+    print("\nNumber of confirmed exoplanets vs non-exoplanets:")
+    print(df["LABEL"].value_counts())
+
+    # Plot distribution
+    df["LABEL"].value_counts().sort_index().plot(kind="bar")
+    plt.title("Exoplanet vs Non-exoplanet count")
+    plt.xlabel("Label")
+    plt.ylabel("Count")
+    plt.show()
+else:
+    print("\n⚠️ LABEL column not found in dataset!")
+
+
+
+
+# Member 3 - Metrics Evaluation
+
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import (
+    classification_report,
+    confusion_matrix,
+    ConfusionMatrixDisplay
+)
+
+# ✅ Features (X) and labels (y)
+X = df.drop(columns=["LABEL"])
+y = df["LABEL"]
+
+# ✅ Train-test split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# ✅ Train a simple Random Forest model
+model = RandomForestClassifier(n_estimators=100, random_state=42, class_weight="balanced")
+model.fit(X_train, y_train)
+
+# ✅ Predictions
+y_pred = model.predict(X_test)
+
+# ✅ Classification Report
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred))
+
+# ✅ Confusion Matrix
+cm = confusion_matrix(y_test, y_pred)
+disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+disp.plot(cmap="Blues")
+plt.title("Confusion Matrix")
+plt.show()
+
+
+
+
+from sklearn.metrics import confusion_matrix, classification_report, roc_curve, auc, precision_recall_curve
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# ✅ Fix labels: Convert {1,2} → {0,1}
+y_train = y_train.map({1: 0, 2: 1})
+y_test = y_test.map({1: 0, 2: 1})
+
+# ✅ Predictions
+y_pred = model.predict(X_test)
+y_probs = model.predict_proba(X_test)[:, 1]  # probabilities for class 1
+
+# ✅ Confusion Matrix
+cm = confusion_matrix(y_test, y_pred)
+plt.figure(figsize=(5, 4))
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+            xticklabels=["Non-Exoplanet (0)", "Exoplanet (1)"],
+            yticklabels=["Non-Exoplanet (0)", "Exoplanet (1)"])
+plt.title("Confusion Matrix")
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.show()
+
+# ✅ Classification Report
+print("\nClassification Report:\n")
+print(classification_report(y_test, y_pred, target_names=["Non-Exoplanet", "Exoplanet"]))
+
+# ✅ ROC Curve
+fpr, tpr, _ = roc_curve(y_test, y_probs)
+roc_auc = auc(fpr, tpr)
+
+plt.figure(figsize=(6, 5))
+plt.plot(fpr, tpr, color="blue", lw=2, label=f"ROC Curve (AUC = {roc_auc:.2f})")
+plt.plot([0, 1], [0, 1], color="red", linestyle="--")
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate (Recall)")
+plt.title("Receiver Operating Characteristic (ROC)")
+plt.legend(loc="lower right")
+plt.show()
+
+# ✅ Precision-Recall Curve
+precision, recall, _ = precision_recall_curve(y_test, y_probs)
+
+plt.figure(figsize=(6, 5))
+plt.plot(recall, precision, color="green", lw=2)
+plt.xlabel("Recall")
+plt.ylabel("Precision")
+plt.title("Precision-Recall Curve")
+plt.show()
+
+
+
+
+
+import joblib
+import json
+from pathlib import Path
+
+# 📂 Create a models folder if not exists
+models_dir = Path("models")
+models_dir.mkdir(exist_ok=True)
+
+# ✅ Save trained model
+model_path = models_dir / "exoplanet_model.pkl"
+joblib.dump(model, model_path)
+print(f"✅ Model saved at: {model_path}")
+
+# ✅ Save evaluation metrics
+metrics = {
+    "roc_auc": float(roc_auc),
+    "confusion_matrix": cm.tolist(),
+    "classification_report": classification_report(y_test, y_pred, target_names=["Non-Exoplanet", "Exoplanet"], output_dict=True)
+}
+
+metrics_path = models_dir / "metrics.json"
+with open(metrics_path, "w") as f:
+    json.dump(metrics, f, indent=4)
+
+print(f"✅ Metrics saved at: {metrics_path}")
+import joblib
+model = joblib.load("models/exoplanet_model.pkl")
+
+
+
+
+
+
+
+# 📊 Ayushi - Metrics Visualization
+
+import json
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+from sklearn.metrics import ConfusionMatrixDisplay
+
+# Load metrics.json created from Akash's code
+with open("models/metrics.json", "r") as f:
+    metrics = json.load(f)
+
+roc_auc = metrics["roc_auc"]
+cm = np.array(metrics["confusion_matrix"])
+report = metrics["classification_report"]
+
+print("📊 Model Performance Metrics")
+print(f"ROC AUC: {roc_auc:.4f}")
+print("Confusion Matrix:")
+print(cm)
+
+# --- Confusion Matrix Heatmap ---
+disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+disp.plot(cmap="Blues", values_format="d")
+plt.title("Confusion Matrix")
+plt.show()
+
+# --- Bar Plot for Classification Report ---
+classes = []
+precisions = []
+recalls = []
+f1s = []
+
+for label, scores in report.items():
+    if isinstance(scores, dict) and "precision" in scores:
+        classes.append(label)
+        precisions.append(scores["precision"])
+        recalls.append(scores["recall"])
+        f1s.append(scores["f1-score"])
+
+x = np.arange(len(classes))
+width = 0.25
+
+plt.figure(figsize=(10, 6))
+plt.bar(x - width, precisions, width, label="Precision")
+plt.bar(x, recalls, width, label="Recall")
+plt.bar(x + width, f1s, width, label="F1-score")
+
+plt.xticks(x, classes)
+plt.ylabel("Score")
+plt.title("Classification Report Metrics")
+plt.legend()
+plt.ylim(0, 1)
+plt.show()
+
+
+
+
+# 🤖 Khushi - Compare Multiple ML Models
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.metrics import accuracy_score, roc_auc_score
+
+models = {
+    "Logistic Regression": LogisticRegression(max_iter=1000),
+    "SVM": SVC(probability=True),
+    "Random Forest": RandomForestClassifier(),
+    "Gradient Boosting": GradientBoostingClassifier()
+}
+
+results = {}
+for name, clf in models.items():
+    clf.fit(X_train, y_train)
+    y_pred = clf.predict(X_test)
+    y_prob = clf.predict_proba(X_test)[:, 1]
+    acc = accuracy_score(y_test, y_pred)
+    auc = roc_auc_score(y_test, y_prob)
+    results[name] = {"accuracy": acc, "roc_auc": auc}
+
+results
+
+
+
+
+
+# 📊 Ayushi - Visualize Model Performance
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Convert results dict from Khushi's part into a DataFrame
+results_df = pd.DataFrame(results).T.reset_index()
+results_df.rename(columns={"index": "Model"}, inplace=True)
+
+# Print results nicely
+print("Model Performance Comparison:")
+print(results_df)
+
+# 🔹 Plot Accuracy and ROC AUC
+fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+sns.barplot(x="Model", y="accuracy", data=results_df, ax=axes[0], palette="viridis")
+axes[0].set_title("Accuracy Comparison")
+axes[0].set_xticklabels(axes[0].get_xticklabels(), rotation=30)
+
+sns.barplot(x="Model", y="roc_auc", data=results_df, ax=axes[1], palette="magma")
+axes[1].set_title("ROC AUC Comparison")
+axes[1].set_xticklabels(axes[1].get_xticklabels(), rotation=30)
+
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+# 📊 Ayushi - Confusion Matrices for all models
+
+from sklearn.metrics import confusion_matrix
+
+fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+axes = axes.ravel()
+
+for i, (name, model) in enumerate(models.items()):
+    y_pred = model.predict(X_test)
+    cm = confusion_matrix(y_test, y_pred)
+
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=axes[i])
+    axes[i].set_title(f"{name} - Confusion Matrix")
+    axes[i].set_xlabel("Predicted")
+    axes[i].set_ylabel("Actual")
+
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+# 📊 Ayushi - Precision, Recall, F1-Score Comparison
+
+from sklearn.metrics import precision_score, recall_score, f1_score
+
+results = []
+
+for name, model in models.items():
+    y_pred = model.predict(X_test)
+    results.append({
+        "Model": name,
+        "Precision": precision_score(y_test, y_pred, pos_label=1),
+        "Recall": recall_score(y_test, y_pred, pos_label=1),
+        "F1-Score": f1_score(y_test, y_pred, pos_label=1)
+    })
+
+metrics_df = pd.DataFrame(results)
+
+# Print table
+print(metrics_df)
+
+# Bar chart for visual comparison
+metrics_df.set_index("Model")[["Precision", "Recall", "F1-Score"]].plot(
+    kind="bar", figsize=(10, 6))
+plt.title("Model Performance Comparison")
+plt.ylabel("Score")
+plt.ylim(0, 1)
+plt.show()
+
+
+
+
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve, auc as sklearn_auc
+
+# ✅ ROC Curve for all models
+plt.figure(figsize=(7, 6))
+
+for name, model in models.items():
+    if hasattr(model, "predict_proba"):
+        y_probs = model.predict_proba(X_test)[:, 1]  # probabilities
+        fpr, tpr, _ = roc_curve(y_test, y_probs, pos_label=1)
+        roc_auc = sklearn_auc(fpr, tpr)
+        plt.plot(fpr, tpr, label=f"{name} (AUC = {roc_auc:.2f})")
+
+# ✅ Add random guess baseline
+plt.plot([0, 1], [0, 1], "k--", label="Random Guess")
+
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.title("ROC Curve Comparison")
+plt.legend(loc="lower right")
+plt.grid(True)
+plt.show()
+
+
+
+
+
+import seaborn as sns
+from sklearn.metrics import confusion_matrix
+
+# ✅ Plot confusion matrices for each model
+for name, model in models.items():
+    y_pred = model.predict(X_test)
+    cm = confusion_matrix(y_test, y_pred)
+
+    plt.figure(figsize=(5, 4))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", cbar=False,
+                xticklabels=["Predicted Negative", "Predicted Positive"],
+                yticklabels=["Actual Negative", "Actual Positive"])
+    plt.title(f"Confusion Matrix - {name}")
+    plt.ylabel("Actual")
+    plt.xlabel("Predicted")
+    plt.show()
+
+
+
+
+import pandas as pd
+
+# ✅ Collect metrics for each model
+summary = []
+
+for name, model in models.items():
+    y_pred = model.predict(X_test)
+    acc = accuracy_score(y_test, y_pred)
+    prec = precision_score(y_test, y_pred, pos_label=1)
+    rec = recall_score(y_test, y_pred, pos_label=1)
+    f1 = f1_score(y_test, y_pred, pos_label=1)
+
+    summary.append({
+        "Model": name,
+        "Accuracy": acc,
+        "Precision": prec,
+        "Recall": rec,
+        "F1-Score": f1
+    })
+# Convert to DataFrame
+metrics_df = pd.DataFrame(summary)
+
+# ✅ Bar chart
+metrics_df.set_index("Model").plot(kind="bar", figsize=(8, 6))
+plt.title("Model Performance Comparison")
+plt.ylabel("Score")
+plt.ylim(0, 1)  # keep scale between 0 and 1
+plt.xticks(rotation=45)
+plt.legend(loc="lower right")
+plt.grid(axis="y", linestyle="--", alpha=0.7)
+plt.show()
+
+# Also display the table for judges
+display(metrics_df)
+
+
+
+
+import os
+import matplotlib.pyplot as plt
+import sklearn.metrics as metrics
+
+# ✅ Ensure outputs/ folder exists
+os.makedirs("outputs", exist_ok=True)
+
+# ✅ Compare ROC curves for multiple models
+plt.figure(figsize=(8, 6))
+
+for name, model in models.items():
+    if hasattr(model, "predict_proba"):  # some models (like SVM) may not support predict_proba
+        y_probs = model.predict_proba(X_test)[:, 1]
+        fpr, tpr, _ = metrics.roc_curve(y_test, y_probs, pos_label=1)
+        roc_auc = metrics.auc(fpr, tpr)
+        plt.plot(fpr, tpr, label=f"{name} (AUC = {roc_auc:.2f})")
+
+# ✅ Random guess line
+plt.plot([0, 1], [0, 1], "k--", label="Random Guess")
+
+# ✅ Formatting
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.title("ROC Curve Comparison")
+plt.legend(loc="lower right")
+plt.grid(True)
+plt.tight_layout()
+
+# ✅ Save figure (now works because folder exists)
+plt.savefig("outputs/roc_curves.png")
+plt.show()
+
+
+
+
+from sklearn.metrics import precision_recall_curve, average_precision_score
+
+# ✅ Compare Precision-Recall curves for models
+plt.figure(figsize=(8, 6))
+
+for name, model in models.items():
+    if hasattr(model, "predict_proba"):
+        y_probs = model.predict_proba(X_test)[:, 1]
+        precision, recall, _ = precision_recall_curve(y_test, y_probs, pos_label=1)
+        ap_score = average_precision_score(y_test, y_probs)
+        plt.plot(recall, precision, label=f"{name} (AP = {ap_score:.2f})")
+
+# ✅ Formatting
+plt.xlabel("Recall")
+plt.ylabel("Precision")
+plt.title("Precision-Recall Curve Comparison")
+plt.legend(loc="lower left")
+plt.grid(True)
+plt.tight_layout()
+
+# ✅ Save figure
+plt.savefig("outputs/precision_recall_curves.png")
+plt.show()
+
+
+
+
+
+import numpy as np
+
+# ✅ Collect metrics for each model
+summary = {}
+for name, model in models.items():
+    y_pred = model.predict(X_test)
+    summary[name] = {
+        "Accuracy": accuracy_score(y_test, y_pred),
+        "Precision": precision_score(y_test, y_pred, pos_label=1),
+        "Recall": recall_score(y_test, y_pred, pos_label=1),
+        "F1": f1_score(y_test, y_pred, pos_label=1)
+    }
+
+# ✅ Convert to DataFrame for plotting
+summary_df = pd.DataFrame(summary).T  # transpose so models are rows
+summary_df = summary_df.round(3)
+print("📊 Model Metrics Summary:\n", summary_df)
+
+# ✅ Bar plot
+summary_df.plot(kind="bar", figsize=(10, 6))
+plt.title("Model Performance Comparison")
+plt.ylabel("Score")
+plt.ylim(0, 1)
+plt.xticks(rotation=45)
+plt.legend(loc="lower right")
+plt.grid(axis="y")
+plt.tight_layout()
+
+# ✅ Save figure
+plt.savefig("outputs/model_metrics_comparison.png")
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
